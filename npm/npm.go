@@ -49,7 +49,7 @@ type NetworkPolicyManager struct {
 
 	nodeName                     string
 	nsMap                        map[string]*namespace
-	podMap                       map[string]string // Key: Pod uuid, Value: PodIp
+	podMap                       map[string]*npmPod // Key: Pod uuid, Value: npmPod object
 	isAzureNpmChainCreated       bool
 	isSafeToCleanUpAzureNpmChain bool
 
@@ -226,7 +226,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		npInformer:                   npInformer,
 		nodeName:                     os.Getenv("HOSTNAME"),
 		nsMap:                        make(map[string]*namespace),
-		podMap:                       make(map[string]string),
+		podMap:                       make(map[string]*npmPod),
 		isAzureNpmChainCreated:       false,
 		isSafeToCleanUpAzureNpmChain: false,
 		clusterState: telemetry.ClusterState{

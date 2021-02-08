@@ -37,7 +37,7 @@ func TestisSystemPod(t *testing.T) {
 func TestAddPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]string),
+		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -94,7 +94,7 @@ func TestAddPod(t *testing.T) {
 func TestUpdatePod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]string),
+		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -157,7 +157,7 @@ func TestUpdatePod(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]string),
+		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -206,7 +206,7 @@ func TestDeletePod(t *testing.T) {
 func TestAddHostNetworkPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]string),
+		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -258,7 +258,7 @@ func TestAddHostNetworkPod(t *testing.T) {
 func TestUpdateHostNetworkPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]string),
+		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -330,7 +330,7 @@ func TestUpdateHostNetworkPod(t *testing.T) {
 func TestDeleteHostNetworkPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]string),
+		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 

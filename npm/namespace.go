@@ -9,7 +9,6 @@ import (
 	"github.com/Azure/azure-container-networking/npm/ipsm"
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/util"
-	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -19,7 +18,7 @@ type namespace struct {
 	name           string
 	labelsMap      map[string]string
 	setMap         map[string]string
-	podMap         map[types.UID]*corev1.Pod
+	podMap         map[string]*npmPod
 	rawNpMap       map[string]*networkingv1.NetworkPolicy
 	processedNpMap map[string]*networkingv1.NetworkPolicy
 	ipsMgr         *ipsm.IpsetManager
@@ -32,7 +31,7 @@ func newNs(name string) (*namespace, error) {
 		name:           name,
 		labelsMap:      make(map[string]string),
 		setMap:         make(map[string]string),
-		podMap:         make(map[types.UID]*corev1.Pod),
+		podMap:         make(map[string]*npmPod),
 		rawNpMap:       make(map[string]*networkingv1.NetworkPolicy),
 		processedNpMap: make(map[string]*networkingv1.NetworkPolicy),
 		ipsMgr:         ipsm.NewIpsetManager(),
@@ -250,14 +249,15 @@ func (npMgr *NetworkPolicyManager) DeleteNamespace(nsObj *corev1.Namespace) erro
 	nsName, nsLabel := "ns-"+nsObj.ObjectMeta.Name, nsObj.ObjectMeta.Labels
 	log.Logf("NAMESPACE DELETING: [%s/%v]", nsName, nsLabel)
 
-	_, exists := npMgr.nsMap[nsName]
+	cachedNsObj, exists := npMgr.nsMap[nsName]
 	if !exists {
 		return nil
 	}
 
+	log.Logf("NAMESPACE DELETING cached labels: [%s/%v]", nsName, cachedNsObj.labelsMap)
 	// Delete the namespace from its label's ipset list.
 	ipsMgr := npMgr.nsMap[util.KubeAllNamespacesFlag].ipsMgr
-	nsLabels := nsObj.ObjectMeta.Labels
+	nsLabels := cachedNsObj.labelsMap
 	for nsLabelKey, nsLabelVal := range nsLabels {
 		labelKey := "ns-" + nsLabelKey
 		log.Logf("Deleting namespace %s from ipset list %s", nsName, labelKey)
