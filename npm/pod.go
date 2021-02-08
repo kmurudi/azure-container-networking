@@ -93,8 +93,9 @@ func appendNamedPortIpsets(ipsMgr *ipsm.IpsetManager, portList []v1.ContainerPor
 		}
 
 		namedPortname := util.NamedPortIPSetPrefix + port.Name
-		// Add the pod's named ports its ipset.
+
 		if delete {
+			// Delete the pod's named ports from its ipset.
 			ipsMgr.DeleteFromSet(
 				namedPortname,
 				fmt.Sprintf("%s,%s%d", podIP, protocol, port.ContainerPort),
@@ -102,7 +103,7 @@ func appendNamedPortIpsets(ipsMgr *ipsm.IpsetManager, portList []v1.ContainerPor
 			)
 			continue
 		}
-		// Add the pod's named ports its ipset.
+		// Add the pod's named ports to its ipset.
 		ipsMgr.AddToSet(
 			namedPortname,
 			fmt.Sprintf("%s,%s%d", podIP, protocol, port.ContainerPort),
@@ -176,11 +177,9 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 	}
 
 	// Add pod's named ports from its ipset.
-	appendNamedPortIpsets(ipsMgr,
-		podContainerPorts,
-		podUid,
-		podIP,
-		false) // Delete is FALSE
+	if err = appendNamedPortIpsets(ipsMgr, podContainerPorts, podUid, podIP, false); err != nil {
+		log.Errorf("Error: failed to add pod to namespace ipset.")
+	}
 
 	// add the Pod info to the podMap
 	npMgr.podMap[podUid] = npmPodObj
@@ -331,6 +330,18 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		log.Logf("Adding pod %s to ipset %s", newPodObjIP, label)
 		if err = ipsMgr.AddToSet(label, newPodObjIP, util.IpsetNetHashFlag, cachedPodObj.podUID); err != nil {
 			log.Errorf("Error: failed to add pod to label ipset.")
+		}
+	}
+
+	newPodPorts := getContainerPortList(newPodObj)
+	if !reflect.DeepEqual(cachedPodObj.containerPorts, newPodPorts) {
+		// Delete cached pod's named ports from its ipset.
+		if err = appendNamedPortIpsets(ipsMgr, cachedPodObj.containerPorts, cachedPodObj.podUID, cachedPodIP, true); err != nil {
+			log.Errorf("Error: failed to delete pod from namespace ipset.")
+		}
+		// Add new pod's named ports from its ipset.
+		if err = appendNamedPortIpsets(ipsMgr, newPodPorts, cachedPodObj.podUID, newPodObjIP, false); err != nil {
+			log.Errorf("Error: failed to add pod to namespace ipset.")
 		}
 	}
 
