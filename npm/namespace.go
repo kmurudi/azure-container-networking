@@ -18,7 +18,7 @@ type namespace struct {
 	name           string
 	labelsMap      map[string]string
 	setMap         map[string]string
-	podMap         map[string]*npmPod
+	podMap         map[string]*npmPod // Key is PodUID
 	rawNpMap       map[string]*networkingv1.NetworkPolicy
 	processedNpMap map[string]*networkingv1.NetworkPolicy
 	ipsMgr         *ipsm.IpsetManager
@@ -198,39 +198,25 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 	}
 
 	//If the Namespace is not deleted, delete removed labels and create new labels
-	toAddNsLabels, toDeleteNsLabels := util.CompareMapDiff(curNsObj.labelsMap, newNsLabel)
+	toAddNsLabels, toDeleteNsLabels := util.GetIPSetListCompareLabels(curNsObj.labelsMap, newNsLabel)
 
 	// Delete the namespace from its label's ipset list.
 	ipsMgr := npMgr.nsMap[util.KubeAllNamespacesFlag].ipsMgr
-	for nsLabelKey, nsLabelVal := range toDeleteNsLabels {
-		labelKey := "ns-" + nsLabelKey
+	for _, nsLabelVal := range toDeleteNsLabels {
+		labelKey := "ns-" + nsLabelVal
 		log.Logf("Deleting namespace %s from ipset list %s", oldNsNs, labelKey)
 		if err = ipsMgr.DeleteFromList(labelKey, oldNsNs); err != nil {
 			log.Errorf("Error: failed to delete namespace %s from ipset list %s", oldNsNs, labelKey)
 			return err
 		}
-
-		label := "ns-" + nsLabelKey + ":" + nsLabelVal
-		log.Logf("Deleting namespace %s from ipset list %s", oldNsNs, label)
-		if err = ipsMgr.DeleteFromList(label, oldNsNs); err != nil {
-			log.Errorf("Error: failed to delete namespace %s from ipset list %s", oldNsNs, label)
-			return err
-		}
 	}
 
 	// Add the namespace to its label's ipset list.
-	for nsLabelKey, nsLabelVal := range toAddNsLabels {
-		labelKey := "ns-" + nsLabelKey
+	for _, nsLabelVal := range toAddNsLabels {
+		labelKey := "ns-" + nsLabelVal
 		log.Logf("Adding namespace %s to ipset list %s", oldNsNs, labelKey)
 		if err = ipsMgr.AddToList(labelKey, oldNsNs); err != nil {
 			log.Errorf("Error: failed to add namespace %s to ipset list %s", oldNsNs, labelKey)
-			return err
-		}
-
-		label := "ns-" + nsLabelKey + ":" + nsLabelVal
-		log.Logf("Adding namespace %s to ipset list %s", oldNsNs, label)
-		if err = ipsMgr.AddToList(label, oldNsNs); err != nil {
-			log.Errorf("Error: failed to add namespace %s to ipset list %s", oldNsNs, label)
 			return err
 		}
 	}

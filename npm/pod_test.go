@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestisValidPod(t *testing.T) {
+func TestIsValidPod(t *testing.T) {
 	podObj := &corev1.Pod{
 		Status: corev1.PodStatus{
 			Phase: "Running",
@@ -23,7 +23,7 @@ func TestisValidPod(t *testing.T) {
 	}
 }
 
-func TestisSystemPod(t *testing.T) {
+func TestIsSystemPod(t *testing.T) {
 	podObj := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: util.KubeSystemFlag,
@@ -37,7 +37,6 @@ func TestisSystemPod(t *testing.T) {
 func TestAddPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -94,7 +93,6 @@ func TestAddPod(t *testing.T) {
 func TestUpdatePod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -157,7 +155,6 @@ func TestUpdatePod(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -206,7 +203,6 @@ func TestDeletePod(t *testing.T) {
 func TestAddHostNetworkPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -249,7 +245,7 @@ func TestAddHostNetworkPod(t *testing.T) {
 		t.Errorf("TestAddHostNetworkPod failed @ AddPod")
 	}
 
-	if len(npMgr.podMap) >= 1 {
+	if len(npMgr.nsMap[podObj.Namespace].podMap) >= 1 {
 		t.Errorf("TestAddHostNetworkPod failed @ podMap length check")
 	}
 	npMgr.Unlock()
@@ -258,7 +254,6 @@ func TestAddHostNetworkPod(t *testing.T) {
 func TestUpdateHostNetworkPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -321,7 +316,7 @@ func TestUpdateHostNetworkPod(t *testing.T) {
 		t.Errorf("TestUpdateHostNetworkPod failed @ UpdatePod")
 	}
 
-	if len(npMgr.podMap) >= 1 {
+	if len(npMgr.nsMap[oldPodObj.Namespace].podMap) >= 1 {
 		t.Errorf("TestUpdateHostNetworkPod failed @ podMap length check")
 	}
 	npMgr.Unlock()
@@ -330,7 +325,6 @@ func TestUpdateHostNetworkPod(t *testing.T) {
 func TestDeleteHostNetworkPod(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		nsMap:            make(map[string]*namespace),
-		podMap:           make(map[string]*npmPod),
 		TelemetryEnabled: false,
 	}
 
@@ -373,7 +367,7 @@ func TestDeleteHostNetworkPod(t *testing.T) {
 		t.Errorf("TestDeleteHostNetworkPod failed @ AddPod")
 	}
 
-	if len(npMgr.podMap) >= 1 {
+	if len(npMgr.nsMap[podObj.Namespace].podMap) >= 1 {
 		t.Errorf("TestDeleteHostNetworkPod failed @ podMap length check")
 	}
 

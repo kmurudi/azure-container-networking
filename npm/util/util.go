@@ -69,26 +69,38 @@ func SortMap(m *map[string]string) ([]string, []string) {
 	return sortedKeys, sortedVals
 }
 
-// CompareMapDiff will compare two maps string[string] and returns
-// missing values in both
-func CompareMapDiff(orig map[string]string, new map[string]string) (map[string]string, map[string]string) {
-	notInOrig := make(map[string]string)
-	notInNew := make(map[string]string)
+// GetIPSetListFromLabels combine Labels into a single slice
+func GetIPSetListFromLabels(labels map[string]string) []string {
+	var (
+		ipsetList = []string{}
+	)
+	for labelKey, labelVal := range labels {
+		ipsetList = append(ipsetList, labelKey, labelKey+":"+labelVal)
+
+	}
+	return ipsetList
+}
+
+// GetIPSetListCompareLabels compares Labels and
+// returns a delete ipset list and add ipset list
+func GetIPSetListCompareLabels(orig map[string]string, new map[string]string) ([]string, []string) {
+	notInOrig := []string{}
+	notInNew := []string{}
 
 	for keyOrig, valOrig := range orig {
 		if valNew, ok := new[keyOrig]; ok {
 			if valNew != valOrig {
-				notInNew[keyOrig] = valOrig
-				notInOrig[keyOrig] = valNew
+				notInNew = append(notInNew, keyOrig+":"+valOrig)
+				notInOrig = append(notInOrig, keyOrig+":"+valNew)
 			}
 		} else {
-			notInNew[keyOrig] = valOrig
+			notInNew = append(notInNew, keyOrig, keyOrig+":"+valOrig)
 		}
 	}
 
 	for keyNew, valNew := range new {
 		if _, ok := orig[keyNew]; !ok {
-			notInOrig[keyNew] = valNew
+			notInOrig = append(notInOrig, keyNew, keyNew+":"+valNew)
 		}
 	}
 
