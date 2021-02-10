@@ -3,6 +3,7 @@
 package main
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/Azure/azure-container-networking/log"
@@ -58,7 +59,13 @@ func main() {
 		panic(err.Error())
 	}
 
-	factory := informers.NewSharedInformerFactory(clientset, time.Hour*24)
+	// Setting reSyncPeriod to 15 secs
+	minResyncPeriod := 15 * time.Second
+
+	// Adding some randomness so all NPM pods will not request for info at once.
+	factor := rand.Float64() + 1
+	resyncPeriod := time.Duration(float64(minResyncPeriod.Nanoseconds()) * factor)
+	factory := informers.NewSharedInformerFactory(clientset, resyncPeriod)
 
 	npMgr := npm.NewNetworkPolicyManager(clientset, factory, version)
 	metrics.CreateTelemetryHandle(npMgr.GetAppVersion(), npm.GetAIMetadata())
