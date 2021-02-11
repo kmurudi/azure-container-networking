@@ -245,7 +245,7 @@ func TestAddHostNetworkPod(t *testing.T) {
 		t.Errorf("TestAddHostNetworkPod failed @ AddPod")
 	}
 
-	if len(npMgr.nsMap[podObj.Namespace].podMap) >= 1 {
+	if len(npMgr.nsMap["ns-"+podObj.Namespace].podMap) >= 1 {
 		t.Errorf("TestAddHostNetworkPod failed @ podMap length check")
 	}
 	npMgr.Unlock()
@@ -316,7 +316,7 @@ func TestUpdateHostNetworkPod(t *testing.T) {
 		t.Errorf("TestUpdateHostNetworkPod failed @ UpdatePod")
 	}
 
-	if len(npMgr.nsMap[oldPodObj.Namespace].podMap) >= 1 {
+	if len(npMgr.nsMap["ns-"+oldPodObj.Namespace].podMap) >= 1 {
 		t.Errorf("TestUpdateHostNetworkPod failed @ podMap length check")
 	}
 	npMgr.Unlock()
@@ -367,7 +367,7 @@ func TestDeleteHostNetworkPod(t *testing.T) {
 		t.Errorf("TestDeleteHostNetworkPod failed @ AddPod")
 	}
 
-	if len(npMgr.nsMap[podObj.Namespace].podMap) >= 1 {
+	if len(npMgr.nsMap["ns-"+podObj.Namespace].podMap) >= 1 {
 		t.Errorf("TestDeleteHostNetworkPod failed @ podMap length check")
 	}
 

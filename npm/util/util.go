@@ -250,3 +250,8 @@ func DropEmptyFields(s []string) []string {
 
 	return s
 }
+
+// GetNSNameWithPrefix returns Namespace name with ipset prefix
+func GetNSNameWithPrefix(nsName string) string {
+	return NamespacePrefix + nsName
+}

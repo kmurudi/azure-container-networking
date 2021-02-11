@@ -31,7 +31,7 @@ type npmPod struct {
 func newNpmPod(podObj *corev1.Pod) (*npmPod, error) {
 	pod := &npmPod{
 		name:           podObj.ObjectMeta.Name,
-		namespace:      "ns-" + podObj.ObjectMeta.Namespace,
+		namespace:      podObj.ObjectMeta.Namespace,
 		nodeName:       podObj.Spec.NodeName,
 		podUID:         string(podObj.ObjectMeta.UID),
 		podIP:          podObj.Status.PodIP,
@@ -158,7 +158,7 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 
 	var (
 		err               error
-		podNs             = npmPodObj.namespace
+		podNs             = util.GetNSNameWithPrefix(npmPodObj.namespace)
 		podUID            = npmPodObj.podUID
 		podName           = npmPodObj.name
 		podNodeName       = npmPodObj.nodeName
@@ -189,6 +189,7 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 	}
 
 	// Add the pod to its namespace's ipset.
+	// TODO Append "ns+" pos NS name
 	log.Logf("Adding pod %s to ipset %s", podIP, podNs)
 	if err = ipsMgr.AddToSet(podNs, podIP, util.IpsetNetHashFlag, podUID); err != nil {
 		log.Errorf("Error: failed to add pod to namespace ipset.")
@@ -247,12 +248,12 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 
 	var (
 		err            error
-		oldPodObjNs    = oldPodObj.ObjectMeta.Namespace
+		oldPodObjNs    = util.GetNSNameWithPrefix(oldPodObj.ObjectMeta.Namespace)
 		oldPodObjName  = oldPodObj.ObjectMeta.Name
 		oldPodObjLabel = oldPodObj.ObjectMeta.Labels
 		oldPodObjPhase = oldPodObj.Status.Phase
 		oldPodObjIP    = oldPodObj.Status.PodIP
-		newPodObjNs    = newPodObj.ObjectMeta.Namespace
+		newPodObjNs    = util.GetNSNameWithPrefix(newPodObj.ObjectMeta.Namespace)
 		newPodObjName  = newPodObj.ObjectMeta.Name
 		newPodObjLabel = newPodObj.ObjectMeta.Labels
 		newPodObjPhase = newPodObj.Status.Phase
@@ -401,7 +402,7 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 
 	var (
 		err             error
-		podNs           = cachedPodObj.namespace
+		podNs           = util.GetNSNameWithPrefix(cachedPodObj.namespace)
 		podUID          = cachedPodObj.podUID
 		podName         = podObj.ObjectMeta.Name
 		podNodeName     = podObj.Spec.NodeName

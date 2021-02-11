@@ -33,7 +33,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 		err    error
 		ns     *namespace
 		exists bool
-		npNs   = "ns-" + npObj.ObjectMeta.Namespace
+		npNs   = util.GetNSNameWithPrefix(npObj.ObjectMeta.Namespace)
 		npName = npObj.ObjectMeta.Name
 		allNs  = npMgr.nsMap[util.KubeAllNamespacesFlag]
 		timer  = metrics.StartNewTimer()
