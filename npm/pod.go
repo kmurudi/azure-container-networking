@@ -88,7 +88,10 @@ func isInvalidPodUpdate(oldPodObj, newPodObj *corev1.Pod) (isInvalidUpdate bool)
 		oldPodObj.Status.Phase == newPodObj.Status.Phase &&
 		newPodObj.ObjectMeta.DeletionTimestamp == nil &&
 		newPodObj.ObjectMeta.DeletionGracePeriodSeconds == nil
-	isInvalidUpdate = isInvalidUpdate && reflect.DeepEqual(oldPodObj.ObjectMeta.Labels, newPodObj.ObjectMeta.Labels)
+	isInvalidUpdate = isInvalidUpdate &&
+		reflect.DeepEqual(oldPodObj.ObjectMeta.Labels, newPodObj.ObjectMeta.Labels) &&
+		reflect.DeepEqual(oldPodObj.Status.PodIPs, newPodObj.Status.PodIPs) &&
+		reflect.DeepEqual(getContainerPortList(oldPodObj), getContainerPortList(newPodObj))
 
 	return
 }
@@ -226,6 +229,10 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		return nil
 	}
 
+	if isInvalidPodUpdate(oldPodObj, newPodObj) {
+		return nil
+	}
+
 	// today K8s does not allow updating HostNetwork flag for an existing Pod. So NPM can safely
 	// check on the oldPodObj for hostNework value
 	if isHostNetworkPod(oldPodObj) {
@@ -234,10 +241,6 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 			oldPodObj.ObjectMeta.Namespace, oldPodObj.ObjectMeta.Name, oldPodObj.Status.PodIP,
 			newPodObj.ObjectMeta.Namespace, newPodObj.ObjectMeta.Name, newPodObj.Status.PodIP,
 		)
-		return nil
-	}
-
-	if isInvalidPodUpdate(oldPodObj, newPodObj) {
 		return nil
 	}
 
