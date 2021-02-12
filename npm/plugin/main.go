@@ -16,6 +16,7 @@ import (
 )
 
 const waitForTelemetryInSeconds = 60
+const resyncPeriodInMinutes = 15
 
 // Version is populated by make during build.
 var version string
@@ -60,7 +61,7 @@ func main() {
 	}
 
 	// Setting reSyncPeriod to 15 secs
-	minResyncPeriod := 15 * time.Second
+	minResyncPeriod := resyncPeriodInMinutes * time.Minute
 
 	// Adding some randomness so all NPM pods will not request for info at once.
 	factor := rand.Float64() + 1
