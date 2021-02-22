@@ -15,14 +15,15 @@ import (
 )
 
 type namespace struct {
-	name           string
-	labelsMap      map[string]string
-	setMap         map[string]string
-	podMap         map[string]*npmPod // Key is PodUID
-	rawNpMap       map[string]*networkingv1.NetworkPolicy
-	processedNpMap map[string]*networkingv1.NetworkPolicy
-	ipsMgr         *ipsm.IpsetManager
-	iptMgr         *iptm.IptablesManager
+	name            string
+	labelsMap       map[string]string
+	setMap          map[string]string
+	podMap          map[string]*npmPod // Key is PodUID
+	rawNpMap        map[string]*networkingv1.NetworkPolicy
+	processedNpMap  map[string]*networkingv1.NetworkPolicy
+	ipsMgr          *ipsm.IpsetManager
+	iptMgr          *iptm.IptablesManager
+	resourceVersion string
 }
 
 // newNS constructs a new namespace object.
@@ -36,9 +37,17 @@ func newNs(name string) (*namespace, error) {
 		processedNpMap: make(map[string]*networkingv1.NetworkPolicy),
 		ipsMgr:         ipsm.NewIpsetManager(),
 		iptMgr:         iptm.NewIptablesManager(),
+		// resource version is converted to uint64
+		// so make sure it is initialized to "0"
+		resourceVersion: "0",
 	}
 
 	return ns, nil
+}
+
+// setResourceVersion setter func for RV
+func setResourceVersion(nsObj *namespace, rv string) {
+	nsObj.resourceVersion = rv
 }
 
 func isSystemNs(nsObj *corev1.Namespace) bool {
@@ -55,12 +64,22 @@ func isInvalidNamespaceUpdate(oldNsObj, newNsObj *corev1.Namespace) (isInvalidUp
 }
 
 func (ns *namespace) policyExists(npObj *networkingv1.NetworkPolicy) bool {
-	if np, exists := ns.rawNpMap[npObj.ObjectMeta.Name]; exists {
+	np, exists := ns.rawNpMap[npObj.ObjectMeta.Name]
+	if exists {
 		if isSamePolicy(np, npObj) {
 			return true
 		}
 	}
 
+	check, err := util.CompareResourceVersions(np.ObjectMeta.ResourceVersion, npObj.ObjectMeta.ResourceVersion)
+	if err != nil {
+		return false
+	}
+
+	if !check && err == nil {
+		log.Logf("Cached Network Policy has larger ResourceVersion number than new Obj of %s\n", npObj.ObjectMeta.Name)
+		return true
+	}
 	return false
 }
 
@@ -139,6 +158,7 @@ func (npMgr *NetworkPolicyManager) AddNamespace(nsObj *corev1.Namespace) error {
 	if err != nil {
 		log.Errorf("Error: failed to create namespace %s", nsName)
 	}
+	setResourceVersion(ns, nsObj.GetObjectMeta().GetResourceVersion())
 
 	// Append all labels to the cache NS obj
 	ns.labelsMap = util.AppendMap(ns.labelsMap, nsLabel)
@@ -197,6 +217,16 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 		return nil
 	}
 
+	check, err := util.CompareResourceVersions(curNsObj.resourceVersion, newNsObj.ObjectMeta.ResourceVersion)
+	if err != nil {
+		log.Errorf("Error: failed on resource version check while updating Namespace %s with error %+v", oldNsNs, err)
+	}
+
+	if !check && err == nil {
+		log.Logf("Cached NameSpace has larger ResourceVersion number than new Obj of %s\n", oldNsNs)
+		return nil
+	}
+
 	//If the Namespace is not deleted, delete removed labels and create new labels
 	addToIPSets, deleteFromIPSets := util.GetIPSetListCompareLabels(curNsObj.labelsMap, newNsLabel)
 
@@ -223,6 +253,7 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 
 	// Append all labels to the cache NS obj
 	curNsObj.labelsMap = util.ClearAndAppendMap(curNsObj.labelsMap, newNsLabel)
+	setResourceVersion(curNsObj, newNsObj.GetObjectMeta().GetResourceVersion())
 	npMgr.nsMap[newNsNs] = curNsObj
 
 	return nil

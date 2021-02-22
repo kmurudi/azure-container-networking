@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -254,4 +255,30 @@ func DropEmptyFields(s []string) []string {
 // GetNSNameWithPrefix returns Namespace name with ipset prefix
 func GetNSNameWithPrefix(nsName string) string {
 	return NamespacePrefix + nsName
+}
+
+// CompareResourceVersions take in two resource versions and returns true if new is greater than old
+func CompareResourceVersions(rvOld string, rvNew string) (bool, error) {
+	var err error
+
+	// Ignore oldRV error as we care about new RV
+	tempRvOld, _ := ParseResourceVersion(rvOld)
+
+	tempRvnew, err := ParseResourceVersion(rvNew)
+	if err != nil {
+		return false, err
+	}
+	if tempRvnew > tempRvOld {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// ParseResourceVersion get uint64 version of ResourceVersion
+func ParseResourceVersion(rv string) (uint64, error) {
+	if rv == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(rv, 10, 64)
 }

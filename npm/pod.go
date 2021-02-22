@@ -17,28 +17,30 @@ import (
 )
 
 type npmPod struct {
-	name           string
-	namespace      string
-	nodeName       string
-	podUID         string
-	podIP          string
-	isHostNetwork  bool
-	podIPs         []v1.PodIP
-	labels         map[string]string
-	containerPorts []v1.ContainerPort
+	name            string
+	namespace       string
+	nodeName        string
+	podUID          string
+	podIP           string
+	isHostNetwork   bool
+	podIPs          []v1.PodIP
+	labels          map[string]string
+	containerPorts  []v1.ContainerPort
+	resourceVersion string
 }
 
 func newNpmPod(podObj *corev1.Pod) (*npmPod, error) {
 	pod := &npmPod{
-		name:           podObj.ObjectMeta.Name,
-		namespace:      podObj.ObjectMeta.Namespace,
-		nodeName:       podObj.Spec.NodeName,
-		podUID:         string(podObj.ObjectMeta.UID),
-		podIP:          podObj.Status.PodIP,
-		podIPs:         podObj.Status.PodIPs,
-		isHostNetwork:  podObj.Spec.HostNetwork,
-		labels:         podObj.Labels,
-		containerPorts: getContainerPortList(podObj),
+		name:            podObj.ObjectMeta.Name,
+		namespace:       podObj.ObjectMeta.Namespace,
+		nodeName:        podObj.Spec.NodeName,
+		podUID:          string(podObj.ObjectMeta.UID),
+		podIP:           podObj.Status.PodIP,
+		podIPs:          podObj.Status.PodIPs,
+		isHostNetwork:   podObj.Spec.HostNetwork,
+		labels:          podObj.Labels,
+		containerPorts:  getContainerPortList(podObj),
+		resourceVersion: podObj.GetObjectMeta().GetResourceVersion(),
 	}
 
 	return pod, nil
@@ -245,9 +247,12 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		return nil
 	}
 
-	invalidPodPhase := false
 	if newPodObj.Status.Phase == v1.PodSucceeded || newPodObj.Status.Phase == v1.PodFailed {
-		invalidPodPhase = true
+		if delErr := npMgr.DeletePod(newPodObj); delErr != nil {
+			log.Errorf("Error: failed to add pod during update with error %+v", delErr)
+		}
+
+		return nil
 	}
 
 	var (
@@ -279,12 +284,23 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 
 	cachedPodObj, exists := npMgr.nsMap[oldPodObjNs].podMap[string(oldPodObj.ObjectMeta.UID)]
 	if !exists {
-		// NPM will check for non-existent pods to be added. Will ignore Succeeded or deleted pods.
-		if !invalidPodPhase {
-			if addErr := npMgr.AddPod(newPodObj); addErr != nil {
-				log.Errorf("Error: failed to add pod during update with error %+v", addErr)
-			}
+		if addErr := npMgr.AddPod(newPodObj); addErr != nil {
+			log.Errorf("Error: failed to add pod during update with error %+v", addErr)
 		}
+		return nil
+	}
+
+	check, err := util.CompareResourceVersions(cachedPodObj.resourceVersion, newPodObj.ObjectMeta.ResourceVersion)
+	if err != nil {
+		log.Errorf("Error: failed on resource version check while updating pod with error %+v", err)
+	}
+
+	if !check && err == nil {
+		log.Logf(
+			"POD UPDATING ignored as resourceVersion of cached pod is greater Pod:\n cached pod: [%s/%s/%s/%s]\n new pod: [%s/%s/%s/%s]",
+			cachedPodObj.namespace, cachedPodObj.name, cachedPodObj.podIP, cachedPodObj.resourceVersion,
+			newPodObj.ObjectMeta.Namespace, newPodObj.ObjectMeta.Name, newPodObj.Status.PodIP, newPodObj.ObjectMeta.ResourceVersion,
+		)
 
 		return nil
 	}
@@ -314,10 +330,8 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 
 		// Assume that the pod IP will be released when pod moves to succeeded or failed state.
 		// If the pod transitions back to an active state, then add operation will re establish the updated pod info.
-		if !invalidPodPhase {
-			// new PodIP needs to be added to all newLabels
-			addToIPSets = util.GetIPSetListFromLabels(newPodObjLabel)
-		}
+		// new PodIP needs to be added to all newLabels
+		addToIPSets = util.GetIPSetListFromLabels(newPodObjLabel)
 
 		// Delete the pod from its namespace's ipset.
 		log.Logf("Deleting pod %s %s from ipset %s and adding pod %s to ipset %s",
@@ -347,15 +361,8 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		//TODO check keys are some then dont delete
 		//TODO compare the keys too and not just key + labels
 
-		// Assume that the pod IP will be released when pod moves to succeeded or failed state.
-		// If the pod transitions back to an active state, then add operation will re establish the updated pod info.
-		if invalidPodPhase {
-			deleteFromIPSets = util.GetIPSetListFromLabels(cachedLabels)
-		} else {
-			// delete PodIP from removed labels and add PodIp to new labels
-			addToIPSets, deleteFromIPSets = util.GetIPSetListCompareLabels(cachedLabels, newPodObjLabel)
-		}
-
+		// delete PodIP from removed labels and add PodIp to new labels
+		addToIPSets, deleteFromIPSets = util.GetIPSetListCompareLabels(cachedLabels, newPodObjLabel)
 	}
 
 	// Delete the pod from its label's ipset.
@@ -387,6 +394,12 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		if err = appendNamedPortIpsets(ipsMgr, newPodPorts, cachedPodObj.podUID, newPodObjIP, false); err != nil {
 			log.Errorf("Error: failed to add pod to namespace ipset.")
 		}
+	}
+
+	// Updating pod cache with new information
+	npMgr.nsMap[oldPodObjNs].podMap[cachedPodObj.podUID], err = newNpmPod(newPodObj)
+	if err != nil {
+		return err
 	}
 
 	return nil
