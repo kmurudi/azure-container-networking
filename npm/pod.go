@@ -86,6 +86,7 @@ func isInvalidPodUpdate(oldPodObj, newPodObj *corev1.Pod) (isInvalidUpdate bool)
 	isInvalidUpdate = oldPodObj.ObjectMeta.Namespace == newPodObj.ObjectMeta.Namespace &&
 		oldPodObj.ObjectMeta.Name == newPodObj.ObjectMeta.Name &&
 		oldPodObj.Status.Phase == newPodObj.Status.Phase &&
+		oldPodObj.Status.PodIP == newPodObj.Status.PodIP &&
 		newPodObj.ObjectMeta.DeletionTimestamp == nil &&
 		newPodObj.ObjectMeta.DeletionGracePeriodSeconds == nil
 	isInvalidUpdate = isInvalidUpdate &&
