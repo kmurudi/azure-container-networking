@@ -198,11 +198,11 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 	}
 
 	//If the Namespace is not deleted, delete removed labels and create new labels
-	toAddNsLabels, toDeleteNsLabels := util.GetIPSetListCompareLabels(curNsObj.labelsMap, newNsLabel)
+	addToIPSets, deleteFromIPSets := util.GetIPSetListCompareLabels(curNsObj.labelsMap, newNsLabel)
 
 	// Delete the namespace from its label's ipset list.
 	ipsMgr := npMgr.nsMap[util.KubeAllNamespacesFlag].ipsMgr
-	for _, nsLabelVal := range toDeleteNsLabels {
+	for _, nsLabelVal := range deleteFromIPSets {
 		labelKey := util.GetNSNameWithPrefix(nsLabelVal)
 		log.Logf("Deleting namespace %s from ipset list %s", oldNsNs, labelKey)
 		if err = ipsMgr.DeleteFromList(labelKey, oldNsNs); err != nil {
@@ -212,7 +212,7 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 	}
 
 	// Add the namespace to its label's ipset list.
-	for _, nsLabelVal := range toAddNsLabels {
+	for _, nsLabelVal := range addToIPSets {
 		labelKey := util.GetNSNameWithPrefix(nsLabelVal)
 		log.Logf("Adding namespace %s to ipset list %s", oldNsNs, labelKey)
 		if err = ipsMgr.AddToList(labelKey, oldNsNs); err != nil {

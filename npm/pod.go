@@ -300,8 +300,8 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		cachedPodObj.namespace, cachedPodObj.name, cachedPodObj.labels, cachedPodObj.podIP,
 	)
 
-	deleteFromLabels := []string{}
-	addToLabels := []string{}
+	deleteFromIPSets := []string{}
+	addToIPSets := []string{}
 
 	// if the podIp exists, it must match the cachedIp
 	if cachedPodIP != newPodObjIP {
@@ -309,13 +309,13 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		log.Errorf("Error: Unexpected state. Pod (Namespace:%s, Name:%s, uid:%s, has cachedPodIp:%s which is different from PodIp:%s",
 			newPodObjNs, newPodObjName, cachedPodObj.podUID, cachedPodIP, newPodObjIP)
 		// cached PodIP needs to be cleaned up from all the cached labels
-		deleteFromLabels = util.GetIPSetListFromLabels(cachedLabels)
+		deleteFromIPSets = util.GetIPSetListFromLabels(cachedLabels)
 
 		// Assume that the pod IP will be released when pod moves to succeeded or failed state.
 		// If the pod transitions back to an active state, then add operation will re establish the updated pod info.
 		if !invalidPodPhase {
 			// new PodIP needs to be added to all newLabels
-			addToLabels = util.GetIPSetListFromLabels(newPodObjLabel)
+			addToIPSets = util.GetIPSetListFromLabels(newPodObjLabel)
 		}
 
 		// Delete the pod from its namespace's ipset.
@@ -349,16 +349,16 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		// Assume that the pod IP will be released when pod moves to succeeded or failed state.
 		// If the pod transitions back to an active state, then add operation will re establish the updated pod info.
 		if invalidPodPhase {
-			deleteFromLabels = util.GetIPSetListFromLabels(cachedLabels)
+			deleteFromIPSets = util.GetIPSetListFromLabels(cachedLabels)
 		} else {
 			// delete PodIP from removed labels and add PodIp to new labels
-			addToLabels, deleteFromLabels = util.GetIPSetListCompareLabels(cachedLabels, newPodObjLabel)
+			addToIPSets, deleteFromIPSets = util.GetIPSetListCompareLabels(cachedLabels, newPodObjLabel)
 		}
 
 	}
 
 	// Delete the pod from its label's ipset.
-	for _, podIPSetName := range deleteFromLabels {
+	for _, podIPSetName := range deleteFromIPSets {
 		log.Logf("Deleting pod %s from ipset %s", cachedPodIP, podIPSetName)
 		if err = ipsMgr.DeleteFromSet(podIPSetName, cachedPodIP, cachedPodObj.podUID); err != nil {
 			log.Errorf("Error: failed to delete pod from label ipset.")
@@ -366,7 +366,7 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 	}
 
 	// Add the pod to its label's ipset.
-	for _, addIPSetName := range addToLabels {
+	for _, addIPSetName := range addToIPSets {
 		log.Logf("Adding pod %s to ipset %s", newPodObjIP, addIPSetName)
 		if err = ipsMgr.AddToSet(addIPSetName, newPodObjIP, util.IpsetNetHashFlag, cachedPodObj.podUID); err != nil {
 			log.Errorf("Error: failed to add pod to label ipset.")
