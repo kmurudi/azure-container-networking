@@ -233,10 +233,7 @@ func TestCompareResourceVersions(t *testing.T) {
 	oldRv := "12345"
 	newRV := "23456"
 
-	check, err := CompareResourceVersions(oldRv, newRV)
-	if err != nil {
-		t.Errorf("TestCompareResourceVersions failed @ compare RVs with error %s", err.Error())
-	}
+	check := CompareResourceVersions(oldRv, newRV)
 	if !check {
 		t.Errorf("TestCompareResourceVersions failed @ compare RVs with error returned wrong result ")
 	}
@@ -247,10 +244,7 @@ func TestInValidOldResourceVersions(t *testing.T) {
 	oldRv := "sssss"
 	newRV := "23456"
 
-	check, err := CompareResourceVersions(oldRv, newRV)
-	if err != nil {
-		t.Errorf("TestInValidOldResourceVersions failed @ compare RVs with error %s", err.Error())
-	}
+	check := CompareResourceVersions(oldRv, newRV)
 	if !check {
 		t.Errorf("TestInValidOldResourceVersions failed @ compare RVs with error returned wrong result ")
 	}
@@ -261,10 +255,7 @@ func TestInValidNewResourceVersions(t *testing.T) {
 	oldRv := "12345"
 	newRV := "sssss"
 
-	check, err := CompareResourceVersions(oldRv, newRV)
-	if err == nil {
-		t.Errorf("TestInValidNewResourceVersions failed @ compare RVs with out error")
-	}
+	check := CompareResourceVersions(oldRv, newRV)
 	if check {
 		t.Errorf("TestInValidNewResourceVersions failed @ compare RVs with error returned wrong result ")
 	}
@@ -274,8 +265,8 @@ func TestInValidNewResourceVersions(t *testing.T) {
 func TestParseResourceVersion(t *testing.T) {
 	testRv := "string"
 
-	_, err := ParseResourceVersion(testRv)
-	if err == nil {
+	check := ParseResourceVersion(testRv)
+	if check > 0 {
 		t.Errorf("TestParseResourceVersion failed @ inavlid RV gave no error")
 	}
 }

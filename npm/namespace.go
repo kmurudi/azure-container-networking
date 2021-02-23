@@ -23,7 +23,7 @@ type namespace struct {
 	processedNpMap  map[string]*networkingv1.NetworkPolicy
 	ipsMgr          *ipsm.IpsetManager
 	iptMgr          *iptm.IptablesManager
-	resourceVersion string
+	resourceVersion uint64 // NameSpace ResourceVersion
 }
 
 // newNS constructs a new namespace object.
@@ -39,7 +39,7 @@ func newNs(name string) (*namespace, error) {
 		iptMgr:         iptm.NewIptablesManager(),
 		// resource version is converted to uint64
 		// so make sure it is initialized to "0"
-		resourceVersion: "0",
+		resourceVersion: 0,
 	}
 
 	return ns, nil
@@ -47,7 +47,7 @@ func newNs(name string) (*namespace, error) {
 
 // setResourceVersion setter func for RV
 func setResourceVersion(nsObj *namespace, rv string) {
-	nsObj.resourceVersion = rv
+	nsObj.resourceVersion = util.ParseResourceVersion(rv)
 }
 
 func isSystemNs(nsObj *corev1.Namespace) bool {
@@ -73,12 +73,7 @@ func (ns *namespace) policyExists(npObj *networkingv1.NetworkPolicy) bool {
 		return true
 	}
 
-	check, err := util.CompareResourceVersions(np.ObjectMeta.ResourceVersion, npObj.ObjectMeta.ResourceVersion)
-	if err != nil {
-		return false
-	}
-
-	if !check && err == nil {
+	if !util.CompareResourceVersions(np.ObjectMeta.ResourceVersion, npObj.ObjectMeta.ResourceVersion) {
 		log.Logf("Cached Network Policy has larger ResourceVersion number than new Obj of %s\n", npObj.ObjectMeta.Name)
 		return true
 	}
@@ -220,12 +215,8 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 		return nil
 	}
 
-	check, err := util.CompareResourceVersions(curNsObj.resourceVersion, newNsObj.ObjectMeta.ResourceVersion)
-	if err != nil {
-		log.Errorf("Error: failed on resource version check while updating Namespace %s with error %+v", oldNsNs, err)
-	}
-
-	if !check && err == nil {
+	if !util.CompareUintResourceVersions(curNsObj.resourceVersion,
+		util.ParseResourceVersion(newNsObj.ObjectMeta.ResourceVersion)) {
 		log.Logf("Cached NameSpace has larger ResourceVersion number than new Obj of %s\n", oldNsNs)
 		return nil
 	}

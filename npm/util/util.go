@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-container-networking/log"
 	"github.com/Masterminds/semver"
 	"k8s.io/apimachinery/pkg/version"
 )
@@ -258,27 +259,35 @@ func GetNSNameWithPrefix(nsName string) string {
 }
 
 // CompareResourceVersions take in two resource versions and returns true if new is greater than old
-func CompareResourceVersions(rvOld string, rvNew string) (bool, error) {
-	var err error
-
+func CompareResourceVersions(rvOld string, rvNew string) bool {
 	// Ignore oldRV error as we care about new RV
-	tempRvOld, _ := ParseResourceVersion(rvOld)
-
-	tempRvnew, err := ParseResourceVersion(rvNew)
-	if err != nil {
-		return false, err
-	}
+	tempRvOld := ParseResourceVersion(rvOld)
+	tempRvnew := ParseResourceVersion(rvNew)
 	if tempRvnew > tempRvOld {
-		return true, nil
+		return true
 	}
 
-	return false, nil
+	return false
+}
+
+// CompareUintResourceVersions take in two resource versions as uint and returns true if new is greater than old
+func CompareUintResourceVersions(rvOld uint64, rvNew uint64) bool {
+	if rvNew > rvOld {
+		return true
+	}
+
+	return false
 }
 
 // ParseResourceVersion get uint64 version of ResourceVersion
-func ParseResourceVersion(rv string) (uint64, error) {
+func ParseResourceVersion(rv string) uint64 {
 	if rv == "" {
-		return 0, nil
+		return 0
 	}
-	return strconv.ParseUint(rv, 10, 64)
+	rvInt, err := strconv.ParseUint(rv, 10, 64)
+	if err != nil {
+		log.Logf("Error: while parsing resource version to uint64 %s", rv)
+	}
+
+	return rvInt
 }

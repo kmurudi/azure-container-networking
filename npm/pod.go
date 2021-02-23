@@ -26,10 +26,12 @@ type npmPod struct {
 	podIPs          []v1.PodIP
 	labels          map[string]string
 	containerPorts  []v1.ContainerPort
-	resourceVersion string
+	resourceVersion uint64 // Pod Resource Version
+	phase           corev1.PodPhase
 }
 
 func newNpmPod(podObj *corev1.Pod) (*npmPod, error) {
+	rv := util.ParseResourceVersion(podObj.GetObjectMeta().GetResourceVersion())
 	pod := &npmPod{
 		name:            podObj.ObjectMeta.Name,
 		namespace:       podObj.ObjectMeta.Namespace,
@@ -40,7 +42,8 @@ func newNpmPod(podObj *corev1.Pod) (*npmPod, error) {
 		isHostNetwork:   podObj.Spec.HostNetwork,
 		labels:          podObj.Labels,
 		containerPorts:  getContainerPortList(podObj),
-		resourceVersion: podObj.GetObjectMeta().GetResourceVersion(),
+		resourceVersion: rv,
+		phase:           podObj.Status.Phase,
 	}
 
 	return pod, nil
@@ -55,7 +58,7 @@ func getPodObjFromNpmObj(npmPodObj *npmPod) *corev1.Pod {
 			UID:       types.UID(npmPodObj.podUID),
 		},
 		Status: corev1.PodStatus{
-			Phase:  "Running",
+			Phase:  npmPodObj.phase,
 			PodIP:  npmPodObj.podIP,
 			PodIPs: npmPodObj.podIPs,
 		},
@@ -195,7 +198,6 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 	}
 
 	// Add the pod to its namespace's ipset.
-	// TODO Append "ns+" pos NS name
 	log.Logf("Adding pod %s to ipset %s", podIP, podNs)
 	if err = ipsMgr.AddToSet(podNs, podIP, util.IpsetNetHashFlag, podUID); err != nil {
 		log.Errorf("Error: failed to add pod to namespace ipset.")
@@ -227,41 +229,13 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 }
 
 // UpdatePod handles updating pod ip in its label's ipset.
-func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) error {
+func (npMgr *NetworkPolicyManager) UpdatePod(newPodObj *corev1.Pod) error {
 	if !isValidPod(newPodObj) {
-		return nil
-	}
-
-	if isInvalidPodUpdate(oldPodObj, newPodObj) {
-		return nil
-	}
-
-	// today K8s does not allow updating HostNetwork flag for an existing Pod. So NPM can safely
-	// check on the oldPodObj for hostNework value
-	if isHostNetworkPod(oldPodObj) {
-		log.Logf(
-			"POD UPDATING ignored for HostNetwork Pod:\n old pod: [%s/%s/%s]\n new pod: [%s/%s/%s]",
-			oldPodObj.ObjectMeta.Namespace, oldPodObj.ObjectMeta.Name, oldPodObj.Status.PodIP,
-			newPodObj.ObjectMeta.Namespace, newPodObj.ObjectMeta.Name, newPodObj.Status.PodIP,
-		)
-		return nil
-	}
-
-	if newPodObj.Status.Phase == v1.PodSucceeded || newPodObj.Status.Phase == v1.PodFailed {
-		if delErr := npMgr.DeletePod(newPodObj); delErr != nil {
-			log.Errorf("Error: failed to add pod during update with error %+v", delErr)
-		}
-
 		return nil
 	}
 
 	var (
 		err            error
-		oldPodObjNs    = util.GetNSNameWithPrefix(oldPodObj.ObjectMeta.Namespace)
-		oldPodObjName  = oldPodObj.ObjectMeta.Name
-		oldPodObjLabel = oldPodObj.ObjectMeta.Labels
-		oldPodObjPhase = oldPodObj.Status.Phase
-		oldPodObjIP    = oldPodObj.Status.PodIP
 		newPodObjNs    = util.GetNSNameWithPrefix(newPodObj.ObjectMeta.Namespace)
 		newPodObjName  = newPodObj.ObjectMeta.Name
 		newPodObjLabel = newPodObj.ObjectMeta.Labels
@@ -271,18 +245,18 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 	)
 
 	// Add pod namespace if it doesn't exist
-	if _, exists := npMgr.nsMap[oldPodObjNs]; !exists {
-		npMgr.nsMap[oldPodObjNs], err = newNs(oldPodObjNs)
+	if _, exists := npMgr.nsMap[newPodObjNs]; !exists {
+		npMgr.nsMap[newPodObjNs], err = newNs(newPodObjNs)
 		if err != nil {
-			log.Errorf("Error: failed to create namespace %s", oldPodObjNs)
+			log.Errorf("Error: failed to create namespace %s", newPodObjNs)
 		}
-		log.Logf("Creating set: %v, hashedSet: %v", oldPodObjNs, util.GetHashedName(oldPodObjNs))
-		if err = ipsMgr.CreateSet(oldPodObjNs, append([]string{util.IpsetNetHashFlag})); err != nil {
-			log.Logf("Error creating ipset %s", oldPodObjNs)
+		log.Logf("Creating set: %v, hashedSet: %v", newPodObjNs, util.GetHashedName(newPodObjNs))
+		if err = ipsMgr.CreateSet(newPodObjNs, append([]string{util.IpsetNetHashFlag})); err != nil {
+			log.Logf("Error creating ipset %s", newPodObjNs)
 		}
 	}
 
-	cachedPodObj, exists := npMgr.nsMap[oldPodObjNs].podMap[string(oldPodObj.ObjectMeta.UID)]
+	cachedPodObj, exists := npMgr.nsMap[newPodObjNs].podMap[string(newPodObj.ObjectMeta.UID)]
 	if !exists {
 		if addErr := npMgr.AddPod(newPodObj); addErr != nil {
 			log.Errorf("Error: failed to add pod during update with error %+v", addErr)
@@ -290,12 +264,33 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		return nil
 	}
 
-	check, err := util.CompareResourceVersions(cachedPodObj.resourceVersion, newPodObj.ObjectMeta.ResourceVersion)
-	if err != nil {
-		log.Errorf("Error: failed on resource version check while updating pod with error %+v", err)
+	if isInvalidPodUpdate(getPodObjFromNpmObj(cachedPodObj), newPodObj) {
+		return nil
 	}
 
-	if !check && err == nil {
+	// today K8s does not allow updating HostNetwork flag for an existing Pod. So NPM can safely
+	// check on the oldPodObj for hostNework value
+	if isHostNetworkPod(newPodObj) {
+		log.Logf(
+			"POD UPDATING ignored for HostNetwork Pod:\n pod: [%s/%s/%s]",
+			newPodObj.ObjectMeta.Namespace, newPodObj.ObjectMeta.Name, newPodObj.Status.PodIP,
+		)
+		return nil
+	}
+	// We are assuming that FAILED to RUNNING pod will send an update
+	if newPodObj.Status.Phase == v1.PodSucceeded || newPodObj.Status.Phase == v1.PodFailed {
+		if delErr := npMgr.DeletePod(newPodObj); delErr != nil {
+			log.Errorf("Error: failed to add pod during update with error %+v", delErr)
+		}
+
+		return nil
+	}
+
+	check := util.CompareUintResourceVersions(
+		cachedPodObj.resourceVersion,
+		util.ParseResourceVersion(newPodObj.ObjectMeta.ResourceVersion),
+	)
+	if !check {
 		log.Logf(
 			"POD UPDATING ignored as resourceVersion of cached pod is greater Pod:\n cached pod: [%s/%s/%s/%s]\n new pod: [%s/%s/%s/%s]",
 			cachedPodObj.namespace, cachedPodObj.name, cachedPodObj.podIP, cachedPodObj.resourceVersion,
@@ -311,8 +306,7 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 	)
 
 	log.Logf(
-		"POD UPDATING:\n old pod: [%s/%s/%+v/%s/%s]\n new pod: [%s/%s/%+v/%s/%s]\n cached pod: [%s/%s/%+v/%s]",
-		oldPodObjNs, oldPodObjName, oldPodObjLabel, oldPodObjPhase, oldPodObjIP,
+		"POD UPDATING:\n new pod: [%s/%s/%+v/%s/%s]\n cached pod: [%s/%s/%+v/%s]",
 		newPodObjNs, newPodObjName, newPodObjLabel, newPodObjPhase, newPodObjIP,
 		cachedPodObj.namespace, cachedPodObj.name, cachedPodObj.labels, cachedPodObj.podIP,
 	)
@@ -353,14 +347,10 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 		if reflect.DeepEqual(cachedLabels, newPodObjLabel) {
 			log.Logf(
 				"POD UPDATING:\n nothing to delete or add. pod: [%s/%s]",
-				oldPodObjNs, oldPodObjName,
+				newPodObjNs, newPodObjName,
 			)
 			return nil
 		}
-
-		//TODO check keys are some then dont delete
-		//TODO compare the keys too and not just key + labels
-
 		// delete PodIP from removed labels and add PodIp to new labels
 		addToIPSets, deleteFromIPSets = util.GetIPSetListCompareLabels(cachedLabels, newPodObjLabel)
 	}
@@ -397,7 +387,7 @@ func (npMgr *NetworkPolicyManager) UpdatePod(oldPodObj, newPodObj *corev1.Pod) e
 	}
 
 	// Updating pod cache with new information
-	npMgr.nsMap[oldPodObjNs].podMap[cachedPodObj.podUID], err = newNpmPod(newPodObj)
+	npMgr.nsMap[newPodObjNs].podMap[cachedPodObj.podUID], err = newNpmPod(newPodObj)
 	if err != nil {
 		return err
 	}

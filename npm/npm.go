@@ -266,19 +266,14 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 				npMgr.AddPod(podObj)
 				npMgr.Unlock()
 			},
-			UpdateFunc: func(old, new interface{}) {
-				oldPodObj, ok := old.(*corev1.Pod)
-				if !ok {
-					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected old object type: %v", oldPodObj)
-					return
-				}
+			UpdateFunc: func(_, new interface{}) {
 				newPodObj, ok := new.(*corev1.Pod)
 				if !ok {
 					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected new object type: %v", newPodObj)
 					return
 				}
 				npMgr.Lock()
-				npMgr.UpdatePod(oldPodObj, newPodObj)
+				npMgr.UpdatePod(newPodObj)
 				npMgr.Unlock()
 			},
 			DeleteFunc: func(obj interface{}) {
