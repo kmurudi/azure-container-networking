@@ -65,10 +65,12 @@ func isInvalidNamespaceUpdate(oldNsObj, newNsObj *corev1.Namespace) (isInvalidUp
 
 func (ns *namespace) policyExists(npObj *networkingv1.NetworkPolicy) bool {
 	np, exists := ns.rawNpMap[npObj.ObjectMeta.Name]
-	if exists {
-		if isSamePolicy(np, npObj) {
-			return true
-		}
+	if !exists {
+		return false
+	}
+
+	if isSamePolicy(np, npObj) {
+		return true
 	}
 
 	check, err := util.CompareResourceVersions(np.ObjectMeta.ResourceVersion, npObj.ObjectMeta.ResourceVersion)
@@ -80,6 +82,7 @@ func (ns *namespace) policyExists(npObj *networkingv1.NetworkPolicy) bool {
 		log.Logf("Cached Network Policy has larger ResourceVersion number than new Obj of %s\n", npObj.ObjectMeta.Name)
 		return true
 	}
+
 	return false
 }
 
