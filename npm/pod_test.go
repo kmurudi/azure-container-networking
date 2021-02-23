@@ -135,6 +135,7 @@ func TestUpdatePod(t *testing.T) {
 			Labels: map[string]string{
 				"app": "new-test-pod",
 			},
+			ResourceVersion: "1",
 		},
 		Status: corev1.PodStatus{
 			Phase: "Running",

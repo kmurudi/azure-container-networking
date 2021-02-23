@@ -215,8 +215,10 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 		return nil
 	}
 
-	if !util.CompareUintResourceVersions(curNsObj.resourceVersion,
-		util.ParseResourceVersion(newNsObj.ObjectMeta.ResourceVersion)) {
+	if !util.CompareUintResourceVersions(
+		curNsObj.resourceVersion,
+		util.ParseResourceVersion(newNsObj.ObjectMeta.ResourceVersion),
+	) {
 		log.Logf("Cached NameSpace has larger ResourceVersion number than new Obj of %s\n", oldNsNs)
 		return nil
 	}
