@@ -16,7 +16,7 @@ import (
 
 type namespace struct {
 	name            string
-	labelsMap       map[string]string
+	labelsMap       map[string]string // NameSpace labels
 	setMap          map[string]string
 	podMap          map[string]*npmPod // Key is PodUID
 	rawNpMap        map[string]*networkingv1.NetworkPolicy
@@ -69,12 +69,16 @@ func (ns *namespace) policyExists(npObj *networkingv1.NetworkPolicy) bool {
 		return false
 	}
 
-	if isSamePolicy(np, npObj) {
+	if !util.CompareResourceVersions(np.ObjectMeta.ResourceVersion, npObj.ObjectMeta.ResourceVersion) {
+		log.Logf("Cached Network Policy has larger ResourceVersion number than new Obj. Name: %s Cached RV: %d New RV: %d\n",
+			npObj.ObjectMeta.Name,
+			np.ObjectMeta.ResourceVersion,
+			npObj.ObjectMeta.ResourceVersion,
+		)
 		return true
 	}
 
-	if !util.CompareResourceVersions(np.ObjectMeta.ResourceVersion, npObj.ObjectMeta.ResourceVersion) {
-		log.Logf("Cached Network Policy has larger ResourceVersion number than new Obj of %s\n", npObj.ObjectMeta.Name)
+	if isSamePolicy(np, npObj) {
 		return true
 	}
 
@@ -206,20 +210,22 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 		return nil
 	}
 
+	newRv := util.ParseResourceVersion(newNsObj.ObjectMeta.ResourceVersion)
+	if !util.CompareUintResourceVersions(curNsObj.resourceVersion, newRv) {
+		log.Logf("Cached NameSpace has larger ResourceVersion number than new Obj. NameSpace: %s Cached RV: %d New RV:\n",
+			oldNsNs,
+			curNsObj.resourceVersion,
+			newRv,
+		)
+		return nil
+	}
+
 	//if no change in labels then return
 	if reflect.DeepEqual(curNsObj.labelsMap, newNsLabel) {
 		log.Logf(
 			"NAMESPACE UPDATING:\n nothing to delete or add. old namespace: [%s/%v]\n cache namespace: [%s/%v] new namespace: [%s/%v]",
 			oldNsNs, oldNsLabel, curNsObj.name, curNsObj.labelsMap, newNsNs, newNsLabel,
 		)
-		return nil
-	}
-
-	if !util.CompareUintResourceVersions(
-		curNsObj.resourceVersion,
-		util.ParseResourceVersion(newNsObj.ObjectMeta.ResourceVersion),
-	) {
-		log.Logf("Cached NameSpace has larger ResourceVersion number than new Obj of %s\n", oldNsNs)
 		return nil
 	}
 
