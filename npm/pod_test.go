@@ -334,8 +334,8 @@ func TestAddHostNetworkPod(t *testing.T) {
 		t.Errorf("TestAddHostNetworkPod failed @ AddPod")
 	}
 
-	if len(npMgr.nsMap["ns-"+podObj.Namespace].podMap) >= 1 {
-		t.Errorf("TestAddHostNetworkPod failed @ podMap length check")
+	if len(npMgr.nsMap) > 1 {
+		t.Errorf("TestAddHostNetworkPod failed @ nsMap length check")
 	}
 	npMgr.Unlock()
 }
