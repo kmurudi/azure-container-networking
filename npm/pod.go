@@ -234,16 +234,6 @@ func (npMgr *NetworkPolicyManager) UpdatePod(newPodObj *corev1.Pod) error {
 		return nil
 	}
 
-	// today K8s does not allow updating HostNetwork flag for an existing Pod. So NPM can safely
-	// check on the oldPodObj for hostNework value
-	if isHostNetworkPod(newPodObj) {
-		log.Logf(
-			"POD UPDATING ignored for HostNetwork Pod:\n pod: [%s/%s/%s]",
-			newPodObj.ObjectMeta.Namespace, newPodObj.ObjectMeta.Name, newPodObj.Status.PodIP,
-		)
-		return nil
-	}
-
 	var (
 		err            error
 		newPodObjNs    = util.GetNSNameWithPrefix(newPodObj.ObjectMeta.Namespace)
@@ -275,6 +265,16 @@ func (npMgr *NetworkPolicyManager) UpdatePod(newPodObj *corev1.Pod) error {
 	}
 
 	if isInvalidPodUpdate(getPodObjFromNpmObj(cachedPodObj), newPodObj) {
+		return nil
+	}
+
+	// today K8s does not allow updating HostNetwork flag for an existing Pod. So NPM can safely
+	// check on the oldPodObj for hostNework value
+	if isHostNetworkPod(newPodObj) {
+		log.Logf(
+			"POD UPDATING ignored for HostNetwork Pod:\n pod: [%s/%s/%s]",
+			newPodObj.ObjectMeta.Namespace, newPodObj.ObjectMeta.Name, newPodObj.Status.PodIP,
+		)
 		return nil
 	}
 	// We are assuming that FAILED to RUNNING pod will send an update

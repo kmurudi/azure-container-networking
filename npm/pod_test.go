@@ -394,6 +394,9 @@ func TestUpdateHostNetworkPod(t *testing.T) {
 			Phase: "Running",
 			PodIP: "4.3.2.1",
 		},
+		Spec: corev1.PodSpec{
+			HostNetwork: true,
+		},
 	}
 
 	npMgr.Lock()
