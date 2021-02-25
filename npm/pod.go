@@ -399,18 +399,19 @@ func (npMgr *NetworkPolicyManager) UpdatePod(newPodObj *corev1.Pod) error {
 // DeletePod handles deleting pod from its label's ipset.
 func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 
-	if _, exists := npMgr.nsMap[podObj.Namespace]; !exists {
+	podNs := util.GetNSNameWithPrefix(podObj.Namespace)
+
+	if _, exists := npMgr.nsMap[podNs]; !exists {
 		return nil
 	}
 
-	cachedPodObj, exists := npMgr.nsMap[podObj.Namespace].podMap[string(podObj.ObjectMeta.UID)]
+	cachedPodObj, exists := npMgr.nsMap[podNs].podMap[string(podObj.ObjectMeta.UID)]
 	if !exists {
 		return nil
 	}
 
 	var (
 		err             error
-		podNs           = util.GetNSNameWithPrefix(cachedPodObj.namespace)
 		podUID          = cachedPodObj.podUID
 		podName         = podObj.ObjectMeta.Name
 		podNodeName     = podObj.Spec.NodeName

@@ -286,6 +286,10 @@ func TestDeletePod(t *testing.T) {
 	if err := npMgr.DeletePod(podObj); err != nil {
 		t.Errorf("TestDeletePod failed @ DeletePod")
 	}
+
+	if len(npMgr.nsMap["ns-"+podObj.Namespace].podMap) > 1 {
+		t.Errorf("TestDeletePod failed @ podMap length check")
+	}
 	npMgr.Unlock()
 }
 

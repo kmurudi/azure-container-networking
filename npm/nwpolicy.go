@@ -153,7 +153,7 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		allNs = npMgr.nsMap[util.KubeAllNamespacesFlag]
 	)
 
-	npNs, npName := "ns-"+npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
+	npNs, npName := util.GetNSNameWithPrefix(npObj.ObjectMeta.Namespace), npObj.ObjectMeta.Name
 	log.Logf("NETWORK POLICY DELETING: Namespace: %s, Name:%s", npNs, npName)
 
 	var exists bool
