@@ -25,7 +25,7 @@ func (service *HTTPRestService) requestIPConfigHandler(w http.ResponseWriter, r 
 	)
 
 	err = service.Listener.Decode(w, r, &ipconfigRequest)
-	logger.Request(service.Name, &ipconfigRequest, err)
+	logger.Request(service.Name, ipconfigRequest, err)
 	if err != nil {
 		return
 	}
@@ -76,7 +76,7 @@ func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r 
 	}()
 
 	err = service.Listener.Decode(w, r, &req)
-	logger.Request(service.Name, &req, err)
+	logger.Request(service.Name, req, err)
 	if err != nil {
 		returnMessage = err.Error()
 		return
@@ -308,7 +308,7 @@ func (service *HTTPRestService) releaseIPConfig(podInfo cns.KubernetesPodInfo) e
 			return fmt.Errorf("releaseIPConfig failed. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
 		}
 	} else {
-		logger.Errorf("SetIPConfigAsAvailable failed to release, no allocation found for pod")
+		logger.Errorf("SetIPConfigAsAvailable failed to release, no allocation found for pod %v", podInfo)
 		return nil
 	}
 	return nil
