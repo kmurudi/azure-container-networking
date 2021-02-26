@@ -25,7 +25,10 @@ func (service *HTTPRestService) requestIPConfigHandler(w http.ResponseWriter, r 
 	)
 
 	err = service.Listener.Decode(w, r, &ipconfigRequest)
-	logger.Request(service.Name, ipconfigRequest, err)
+	operationName := "requestIPConfigHandler"
+	desiredIPAddress := ipconfigRequest.DesiredIPAddress
+	orchestratorContest := string(ipconfigRequest.OrchestratorContext)
+	logger.Request(service.Name+operationName, desiredIPAddress+orchestratorContest, err)
 	if err != nil {
 		return
 	}
@@ -50,7 +53,7 @@ func (service *HTTPRestService) requestIPConfigHandler(w http.ResponseWriter, r 
 	reserveResp.PodIpInfo = podIpInfo
 
 	err = service.Listener.Encode(w, &reserveResp)
-	logger.Response(service.Name, reserveResp, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
+	logger.Response(service.Name+operationName, reserveResp, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
 }
 
 func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r *http.Request) {
@@ -76,9 +79,14 @@ func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r 
 	}()
 
 	err = service.Listener.Decode(w, r, &req)
-	logger.Request(service.Name, req, err)
+	operationName := "releaseIPConfigHandler"
+	desiredIPAddress := req.DesiredIPAddress
+	orchestratorContext := string(req.OrchestratorContext)
+	logger.Request(service.Name+operationName, desiredIPAddress+orchestratorContext, err)
 	if err != nil {
 		returnMessage = err.Error()
+		logger.Errorf("releaseIPConfigHandler decode failed becase %v, release IP config info %s",
+			returnMessage, desiredIPAddress+orchestratorContext)
 		return
 	}
 
@@ -87,6 +95,8 @@ func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r 
 	if err = service.releaseIPConfig(podInfo); err != nil {
 		statusCode = NotFound
 		returnMessage = err.Error()
+		logger.Errorf("releaseIPConfigHandler releaseIPConfig failed because %v, release IP config info %s",
+			returnMessage, desiredIPAddress+orchestratorContext)
 		return
 	}
 	return
@@ -194,6 +204,8 @@ func (service *HTTPRestService) getIPAddressesHandler(w http.ResponseWriter, r *
 	err = service.Listener.Decode(w, r, &req)
 	if err != nil {
 		returnMessage = err.Error()
+		logger.Errorf("getIPAddressesHandler decode failed because %v, GetIPAddressesRequest is %v",
+			returnMessage, req)
 		return
 	}
 
@@ -278,6 +290,7 @@ func (service *HTTPRestService) setIPConfigAsAllocated(ipconfig cns.IPConfigurat
 	ipconfig.OrchestratorContext = marshalledOrchestratorContext
 	service.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()] = ipconfig.ID
 	service.PodIPConfigState[ipconfig.ID] = ipconfig
+	logger.Printf("Set IP %s with ID %s as allocated to pod %s", ipconfig.IPAddress, ipconfig.ID, podInfo.GetOrchestratorContextKey())
 	return service.PodIPConfigState[ipconfig.ID]
 }
 
@@ -287,6 +300,8 @@ func (service *HTTPRestService) setIPConfigAsAvailable(ipconfig cns.IPConfigurat
 	ipconfig.OrchestratorContext = nil
 	service.PodIPConfigState[ipconfig.ID] = ipconfig
 	delete(service.PodIPIDByOrchestratorContext, podInfo.GetOrchestratorContextKey())
+	logger.Printf("Deleted outdated pod info %s from PodIPIDByOrchestratorContext since IP %s with ID %s will be released and set as Available",
+		podInfo.GetOrchestratorContextKey(), ipconfig.IPAddress, ipconfig.ID)
 	return service.PodIPConfigState[ipconfig.ID]
 }
 
@@ -300,11 +315,11 @@ func (service *HTTPRestService) releaseIPConfig(podInfo cns.KubernetesPodInfo) e
 	ipID := service.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()]
 	if ipID != "" {
 		if ipconfig, isExist := service.PodIPConfigState[ipID]; isExist {
+			logger.Printf("Releasing IP %+v for pod %+v", ipconfig.IPAddress, podInfo)
 			service.setIPConfigAsAvailable(ipconfig, podInfo)
-			logger.Printf("Released IP %+v for pod %+v", ipconfig.IPAddress, podInfo)
-
 		} else {
-			logger.Errorf("Failed to get release ipconfig. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
+			logger.Errorf("Failed to get release ipconfig. Pod %s to IPID %s exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt",
+				podInfo.GetOrchestratorContextKey(), ipID)
 			return fmt.Errorf("releaseIPConfig failed. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
 		}
 	} else {
