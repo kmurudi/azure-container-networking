@@ -246,4 +246,16 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 		t.Fatalf("Available IP address does not match expected, address state: %+v", ipaddresses)
 	}
 	fmt.Println(ipaddresses)
+
+	inmemory, err := cnsClient.GetHTTPServiceStruct()
+	if err != nil {
+		t.Fatalf("Get in-memory http REST Struct failed %+v", err)
+	}
+	fmt.Println("hi2", inmemory.HttpStruct)
+
+	// release requested IP address, expect success
+	err = cnsClient.ReleaseIPAddress(orchestratorContext)
+	if err != nil {
+		t.Fatalf("Expected to not fail when releasing IP reservation found with context: %+v", err)
+	}
 }

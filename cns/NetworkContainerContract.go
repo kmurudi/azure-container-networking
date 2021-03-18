@@ -23,6 +23,7 @@ const (
 	RequestIPConfig                          = "/network/requestipconfig"
 	ReleaseIPConfig                          = "/network/releaseipconfig"
 	GetIPAddresses                           = "/debug/getipaddresses"
+	GetHTTPRestStruct                        = "/debug/gethttpreststruct"
 )
 
 // NetworkContainer Prefixes

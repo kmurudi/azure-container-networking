@@ -190,6 +190,52 @@ func (service *HTTPRestService) GetPodIPConfigState() map[string]cns.IPConfigura
 	return service.PodIPConfigState
 }
 
+func (service *HTTPRestService) getHTTPRestStructHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		req           string
+		resp          GetHTTPResponse
+		statusCode    int
+		returnMessage string
+		err           error
+	)
+
+	statusCode = UnexpectedError
+
+	defer func() {
+		if err != nil {
+			resp.Response.ReturnCode = statusCode
+			resp.Response.Message = returnMessage
+		}
+
+		err = service.Listener.Encode(w, &resp)
+		logger.Response(service.Name, resp, resp.Response.ReturnCode, ReturnCodeToString(resp.Response.ReturnCode), err)
+	}()
+
+	err = service.Listener.Decode(w, r, &req)
+	if err != nil {
+		returnMessage = err.Error()
+		return
+	}
+
+	resp.HttpStruct = service.GetHTTPStruct()
+    fmt.Println("hi ", resp.HttpStruct.AllocatedIPCount)
+	return
+}
+
+func (service *HTTPRestService) GetHTTPStruct() HttpStruct {
+	service.RLock()
+	defer service.RUnlock()
+	//get or create a struct for all fields
+
+	return HttpStruct{
+
+		PodIPIDByOrchestratorContext: service.PodIPIDByOrchestratorContext,
+		PodIPConfigState:             service.PodIPConfigState,
+		AllocatedIPCount:             service.AllocatedIPCount,
+		//IPAMPoolMonitor:              service.IPAMPoolMonitor,
+	}
+}
+
 // GetPendingProgramIPConfigs returns list of IPs which are in pending program status
 func (service *HTTPRestService) GetPendingProgramIPConfigs() []cns.IPConfigurationStatus {
 	service.RLock()
