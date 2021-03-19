@@ -129,7 +129,7 @@ func TestMain(m *testing.M) {
 	httpRestService, err := restserver.NewHTTPRestService(&config, fakes.NewFakeImdsClient(), fakes.NewFakeNMAgentClient())
 	svc = httpRestService.(*restserver.HTTPRestService)
 	svc.Name = "cns-test-server"
-	svc.IPAMPoolMonitor = fakes.NewIPAMPoolMonitorFake()
+	svc.IPAMPoolMonitor = &fakes.IPAMPoolMonitorFake{FakeMinimumIps: 10, FakeMaximumIps: 20}
 
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
@@ -227,13 +227,7 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 		t.Fatalf("Desired result not matching actual result, expected: %+v, actual: %+v", desired, resultIPnet)
 	}
 
-	// release requested IP address, expect success
-	err = cnsClient.ReleaseIPAddress(orchestratorContext)
-	if err != nil {
-		t.Fatalf("Expected to not fail when releasing IP reservation found with context: %+v", err)
-	}
-
-	ipaddresses, err := cnsClient.GetIPAddressesMatchingStates(cns.Available)
+	ipaddresses, err := cnsClient.GetIPAddressesMatchingStates(cns.Allocated)
 	if err != nil {
 		t.Fatalf("Get allocated IP addresses failed %+v", err)
 	}
@@ -242,20 +236,66 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 		t.Fatalf("Number of available IP addresses expected to be 1, actual %+v", ipaddresses)
 	}
 
-	if ipaddresses[0].IPAddress != desiredIpAddress && ipaddresses[0].State != cns.Available {
+	if ipaddresses[0].IPAddress != desiredIpAddress && ipaddresses[0].State != cns.Allocated {
 		t.Fatalf("Available IP address does not match expected, address state: %+v", ipaddresses)
 	}
 	fmt.Println(ipaddresses)
-
-	inmemory, err := cnsClient.GetHTTPServiceStruct()
-	if err != nil {
-		t.Fatalf("Get in-memory http REST Struct failed %+v", err)
-	}
-	fmt.Println("hi2", inmemory.HttpStruct)
 
 	// release requested IP address, expect success
 	err = cnsClient.ReleaseIPAddress(orchestratorContext)
 	if err != nil {
 		t.Fatalf("Expected to not fail when releasing IP reservation found with context: %+v", err)
 	}
+}
+
+func TestCNSClientDebugAPI(t *testing.T) {
+	podName := "testpodname"
+	podNamespace := "testpodnamespace"
+	desiredIpAddress := "10.0.0.5"
+
+	secondaryIps := make([]string, 0)
+	secondaryIps = append(secondaryIps, desiredIpAddress)
+	cnsClient, _ := InitCnsClient("")
+
+	addTestStateToRestServer(t, secondaryIps)
+
+	podInfo := cns.KubernetesPodInfo{PodName: podName, PodNamespace: podNamespace}
+	orchestratorContext, err := json.Marshal(podInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// request IP address
+	_, err1 := cnsClient.RequestIPAddress(orchestratorContext)
+	if err1 != nil {
+		t.Fatalf("get IP from CNS failed with %+v", err1)
+	}
+
+	//test for debug api/cmd to get inmemory data from HTTPRestService
+	inmemory, err := cnsClient.GetHTTPServiceData()
+	if err != nil {
+		t.Errorf("Get in-memory http REST Struct failed %+v", err)
+	}
+
+	if len(inmemory.HttpRestServiceData.PodIPIDByOrchestratorContext) < 1 {
+		t.Errorf("OrchestratorContext map is expected but not returned")
+	}
+
+	//testing Pod IP Configuration Status values set for test
+	podConfig := inmemory.HttpRestServiceData.PodIPConfigState
+	for _, v := range podConfig {
+		if v.IPAddress != "10.0.0.5" || v.State != "Allocated" || v.NCID != "testNcId1" {
+			t.Errorf("Not the expected set values for testing IPConfigurationStatus, %+v", podConfig)
+		}
+	}
+	if len(inmemory.HttpRestServiceData.PodIPConfigState) < 1 {
+		t.Errorf("PodIpConfigState with atleast 1 entry expected but not returned.")
+	}
+
+	if inmemory.HttpRestServiceData.IPAMPoolMonitor.MinimumFreeIps != 10 || inmemory.HttpRestServiceData.IPAMPoolMonitor.MaximumFreeIps != 20 {
+		t.Errorf("IPAMPoolMonitor state is not reflecting the initial set values, %+v", inmemory.HttpRestServiceData.IPAMPoolMonitor)
+	}
+
+	fmt.Println(inmemory.HttpRestServiceData)
+
 }

@@ -372,48 +372,39 @@ func (cnsClient *CNSClient) GetIPAddressesMatchingStates(StateFilter ...string) 
 	return resp.IPConfigurationStatus, err
 }
 
-//GetHTTPServiceStruct gets all in-memory struct details
-func (cnsClient *CNSClient) GetHTTPServiceStruct() (restserver.GetHTTPResponse, error) {
+//GetHTTPServiceData gets all public in-memory struct details for debugging purpose
+func (cnsClient *CNSClient) GetHTTPServiceData() (restserver.GetHTTPServiceDataResponse, error) {
 	var (
-		resp restserver.GetHTTPResponse
+		resp restserver.GetHTTPServiceDataResponse
 		err  error
 		res  *http.Response
-		body bytes.Buffer
 	)
 
-	url := cnsClient.connectionURL + cns.GetHTTPRestStruct
+	url := cnsClient.connectionURL + cns.GetHTTPRestData
 	log.Printf("GetHTTPServiceStruct url %v", url)
 
-	payload := ""
-
-	err = json.NewEncoder(&body).Encode(payload)
+	res, err = http.Get(url)
 	if err != nil {
-		log.Errorf("encoding json failed with %v", err)
-		return resp, err
-	}
-
-	res, err = http.Post(url, contentTypeJSON, &body)
-	if err != nil {
-		log.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
+		log.Errorf("[Azure CNSClient] HTTP Get returned error %v", err.Error())
 		return resp, err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		errMsg := fmt.Sprintf("[Azure CNSClient] GetPodContext invalid http status code: %v", res.StatusCode)
+		errMsg := fmt.Sprintf("[Azure CNSClient] GetHTTPServiceStruct invalid http status code: %v", res.StatusCode)
 		log.Errorf(errMsg)
 		return resp, fmt.Errorf(errMsg)
 	}
 
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] Error received while parsing GetPodContext response resp:%v err:%v", res.Body, err.Error())
+		log.Errorf("[Azure CNSClient] Error received while parsing GetTTPServiceStruct response resp:%v err:%v", res.Body, err.Error())
 		return resp, err
 	}
 
 	if resp.Response.ReturnCode != 0 {
-		log.Errorf("[Azure CNSClient] GetPodContext received error response :%v", resp.Response.Message)
+		log.Errorf("[Azure CNSClient] GetTTPServiceStruct received error response :%v", resp.Response.Message)
 		return resp, fmt.Errorf(resp.Response.Message)
 	}
 

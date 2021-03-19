@@ -190,20 +190,16 @@ func (service *HTTPRestService) GetPodIPConfigState() map[string]cns.IPConfigura
 	return service.PodIPConfigState
 }
 
-func (service *HTTPRestService) getHTTPRestStructHandler(w http.ResponseWriter, r *http.Request) {
+func (service *HTTPRestService) GetHTTPRestDataHandler(w http.ResponseWriter, r *http.Request) {
 	var (
-		req           string
-		resp          GetHTTPResponse
-		statusCode    int
+		resp          GetHTTPServiceDataResponse
 		returnMessage string
 		err           error
 	)
 
-	statusCode = UnexpectedError
-
 	defer func() {
 		if err != nil {
-			resp.Response.ReturnCode = statusCode
+			resp.Response.ReturnCode = UnexpectedError
 			resp.Response.Message = returnMessage
 		}
 
@@ -211,28 +207,18 @@ func (service *HTTPRestService) getHTTPRestStructHandler(w http.ResponseWriter, 
 		logger.Response(service.Name, resp, resp.Response.ReturnCode, ReturnCodeToString(resp.Response.ReturnCode), err)
 	}()
 
-	err = service.Listener.Decode(w, r, &req)
-	if err != nil {
-		returnMessage = err.Error()
-		return
-	}
-
-	resp.HttpStruct = service.GetHTTPStruct()
-    fmt.Println("hi ", resp.HttpStruct.AllocatedIPCount)
+	resp.HttpRestServiceData = service.GetHTTPStruct()
 	return
 }
 
-func (service *HTTPRestService) GetHTTPStruct() HttpStruct {
+func (service *HTTPRestService) GetHTTPStruct() HttpRestServiceData {
 	service.RLock()
 	defer service.RUnlock()
-	//get or create a struct for all fields
 
-	return HttpStruct{
-
+	return HttpRestServiceData{
 		PodIPIDByOrchestratorContext: service.PodIPIDByOrchestratorContext,
 		PodIPConfigState:             service.PodIPConfigState,
-		AllocatedIPCount:             service.AllocatedIPCount,
-		//IPAMPoolMonitor:              service.IPAMPoolMonitor,
+		IPAMPoolMonitor:              service.IPAMPoolMonitor.GetStateSnapshot(),
 	}
 }
 
