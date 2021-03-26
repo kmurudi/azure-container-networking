@@ -399,7 +399,7 @@ func (cnsClient *CNSClient) GetHTTPServiceData() (restserver.GetHTTPServiceDataR
 
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] Error received while parsing GetTTPServiceStruct response resp:%v err:%v", res.Body, err.Error())
+		log.Errorf("[Azure CNSClient] Error received while parsing GetHTTPServiceStruct response resp:%v err:%v", res.Body, err.Error())
 		return resp, err
 	}
 
